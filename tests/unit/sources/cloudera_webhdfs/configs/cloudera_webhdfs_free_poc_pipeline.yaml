@@ -1,0 +1,13 @@
+name: cloudera_webhdfs_free_poc_pipeline
+catalog: custom_catalog
+schema: hdfs_connector_demo
+serverless: true
+channel: PREVIEW
+ingestion_definition:
+  connection_name: cloudera_webhdfs_free_poc_conn
+  objects:
+    - table:
+        source_table: clickstream
+        destination_catalog: custom_catalog
+        destination_schema: hdfs_connector_demo
+        destination_table: bronze_clickstream

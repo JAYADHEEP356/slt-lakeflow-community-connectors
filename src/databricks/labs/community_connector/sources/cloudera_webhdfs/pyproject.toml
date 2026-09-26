@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lakeflow-community-connectors-cloudera-webhdfs"
+version = "0.1.0"
+description = "Lakeflow Community Connector for Cloudera HDFS through Knox WebHDFS"
+requires-python = ">=3.10"
+dependencies = [
+    "lakeflow-community-connectors>=0.1.0",
+    "requests>=2.28.0,<3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0,<9.0", "pyspark>=4.2.0.dev0"]
+
+[tool.setuptools]
+packages = ["databricks.labs.community_connector.sources.cloudera_webhdfs"]
+
+[tool.setuptools.package-dir]
+"databricks.labs.community_connector.sources.cloudera_webhdfs" = "."
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.yaml"]

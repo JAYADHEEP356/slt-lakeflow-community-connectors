@@ -1,0 +1,33 @@
+display_name: Cloudera WebHDFS
+connection:
+  parameters:
+    - name: base_url
+      type: string
+      required: true
+      description: Knox WebHDFS base URL ending in /webhdfs/v1.
+    - name: username
+      type: string
+      required: true
+      description: Knox basic-auth username.
+    - name: password
+      type: string
+      required: true
+      description: Knox basic-auth password.
+    - name: root_path
+      type: string
+      required: true
+      description: HDFS directory containing completed CSV files.
+    - name: request_timeout_seconds
+      type: string
+      required: false
+      description: Timeout for each WebHDFS request. Default 30 seconds.
+    - name: max_retries
+      type: string
+      required: false
+      description: Attempts for retryable HTTP errors. Default 3.
+    - name: ca_bundle
+      type: string
+      required: false
+      description: Optional CA certificate bundle path. Standard TLS verification is used by default.
+
+external_options_allowlist: "max_files_per_batch"
