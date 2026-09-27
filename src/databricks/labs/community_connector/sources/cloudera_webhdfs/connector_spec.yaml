@@ -29,5 +29,17 @@ connection:
       type: string
       required: false
       description: Optional CA certificate bundle path. Standard TLS verification is used by default.
+    - name: host_header
+      type: string
+      required: false
+      description: Optional HTTPS Host header for a private-IP or DNS fallback route.
+    - name: verify_tls
+      type: string
+      required: false
+      description: Set to false only for a non-production lab fallback that uses an IP endpoint.
+    - name: open_proxy_url
+      type: string
+      required: false
+      description: Optional HTTPS gateway route for WebHDFS OPEN redirects when DataNodes are private.
 
 external_options_allowlist: "max_files_per_batch"

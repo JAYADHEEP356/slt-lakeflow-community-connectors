@@ -43,7 +43,7 @@ from pyspark.sql.types import (
     VariantType,
     VariantVal,
 )
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 import base64
 import csv
 import requests
@@ -659,7 +659,17 @@ def register_lakeflow_source(spark):
             self._root_path = self._normalise_path(options.get("root_path", ""))
             self._timeout = float(options.get("request_timeout_seconds", "30"))
             self._max_retries = int(options.get("max_retries", "3"))
-            self._verify_tls: bool | str = options.get("ca_bundle", True)
+            self._host_header = options.get("host_header", "")
+            self._open_proxy_url = options.get("open_proxy_url", "").rstrip("/")
+            verify_tls = options.get("verify_tls", "true")
+            self._verify_tls: bool | str = (
+                str(verify_tls).strip().lower() not in {"false", "0", "no"}
+            )
+            if options.get("ca_bundle"):
+                self._verify_tls = options["ca_bundle"]
+
+            if self._open_proxy_url and urlsplit(self._open_proxy_url).scheme != "https":
+                raise ValueError("open_proxy_url must use HTTPS")
 
             missing = [
                 key
@@ -684,6 +694,27 @@ def register_lakeflow_source(spark):
             encoded_path = quote(self._normalise_path(path), safe="/")
             return f"{self._base_url}{encoded_path}"
 
+        def _open_proxy_url_for(self, redirect_url: str) -> str:
+            """Map a NameNode's private DataNode redirect to a trusted HTTPS proxy.
+
+            This is optional and intended for gateways that expose the DataNode
+            behind a separate public HTTPS route. It prevents credentials from
+            being sent to the private hostname returned by WebHDFS.
+            """
+            redirect = urlsplit(redirect_url)
+            if not redirect.path:
+                raise WebHdfsConnectionError("WebHDFS OPEN redirect did not include a path")
+            proxy = urlsplit(self._open_proxy_url)
+            return urlunsplit(
+                (
+                    "https",
+                    proxy.netloc,
+                    proxy.path.rstrip("/") + redirect.path,
+                    redirect.query,
+                    "",
+                )
+            )
+
         def _request(self, method: str, path: str, *, operation: str) -> requests.Response:
             last_response: requests.Response | None = None
             for attempt in range(self._max_retries):
@@ -693,14 +724,32 @@ def register_lakeflow_source(spark):
                         self._url(path),
                         params={"op": operation},
                         auth=(self._username, self._password),
+                        headers={"Host": self._host_header} if self._host_header else None,
                         timeout=self._timeout,
                         verify=self._verify_tls,
-                        allow_redirects=True,
+                        allow_redirects=not (operation == "OPEN" and self._open_proxy_url),
                     )
                 except (requests.ConnectionError, requests.Timeout) as exc:
-                    raise WebHdfsConnectionError(
-                        f"Could not reach WebHDFS endpoint '{self._base_url}': {exc}"
-                    ) from exc
+                    if attempt == self._max_retries - 1:
+                        raise WebHdfsConnectionError(
+                            f"Could not reach WebHDFS endpoint '{self._base_url}': {exc}"
+                        ) from exc
+                    time.sleep(2**attempt)
+                    continue
+
+                if operation == "OPEN" and self._open_proxy_url and response.is_redirect:
+                    location = response.headers.get("Location")
+                    if not location:
+                        raise WebHdfsConnectionError("WebHDFS OPEN redirect did not include Location")
+                    response = requests.request(
+                        method,
+                        self._open_proxy_url_for(location),
+                        auth=(self._username, self._password),
+                        headers={"Host": self._host_header} if self._host_header else None,
+                        timeout=self._timeout,
+                        verify=self._verify_tls,
+                        allow_redirects=False,
+                    )
 
                 if response.status_code in (401, 403):
                     raise WebHdfsAuthenticationError(
